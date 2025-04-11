@@ -1,9 +1,11 @@
-from transformers import (
-    AutoConfig,
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
-    pipeline,
-)
+import os
+from typing import Literal
+from openai import OpenAI
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+from src import logger, Fore  # noqa
+
+load_dotenv()
 
 
 def preprocess(issue_title, issue_body):
@@ -12,34 +14,54 @@ def preprocess(issue_title, issue_body):
     return doc
 
 
+class IssueLabel(BaseModel):
+    label: Literal[
+        "bug",
+        "enhancement",
+        "question",
+        "documentation",
+        "help wanted",
+        "good first issue",
+    ] = Field(
+        ...,
+        description="The label for the issue: bug, enhancement, question, documentation, help wanted, or good first issue.",
+    )
+    confidence: float = Field(
+        ...,
+        description="The confidence score of the label prediction by the language model.",
+    )
+    reasoning: str = Field(
+        ...,
+        description="The reasoning behind the label prediction by the language model.",
+    )
+
+
 def label_issue(issue_title, issue_body):
-    issue_data = preprocess(issue_title, issue_body)
+    # issue_data = preprocess(issue_title, issue_body)
     # Load the original configuration
-    config = AutoConfig.from_pretrained("PeppoCola/IssueReportClassifier-NLBSE22")
-
-    # Define new label mappings
-    new_id2label = {0: "bug", 1: "enhancement", 2: "question"}
-    new_label2id = {"bug": 0, "enhancement": 1, "question": 2}
-
-    # Update the configuration
-    config.id2label = new_id2label
-    config.label2id = new_label2id
-
-    # Load the model with the updated configuration
-    model = AutoModelForSequenceClassification.from_pretrained(
-        "PeppoCola/IssueReportClassifier-NLBSE22", config=config
-    )
-    tokenizer = AutoTokenizer.from_pretrained("PeppoCola/IssueReportClassifier-NLBSE22")
-
-    # Create the pipeline with the modified model
-    classifier = pipeline(
-        "text-classification",
-        model=model,
-        tokenizer=tokenizer,
-        add_special_tokens=True,
-        padding="longest",
-        truncation=True,
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    prompt = f"""Analyze this GitHub issue and classify it as either 'bug', 'enhancement', 'question', 'documentation', 'help wanted', or 'good first issue'.
+    
+    Issue Title: {issue_title}
+    Issue Description: {issue_body}
+    
+    Provide your response strictly in JSON format with the following keys:
+    - label: The classification (bug/enhancement/question)
+    - confidence: A number between 0 and 1
+    - reasoning: Brief explanation for the classification
+    """
+    response = client.beta.chat.completions.parse(
+        model="gpt-4o-mini",
+        response_format=IssueLabel,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an expert GitHub issue classifier that provides structured JSON outputs.",
+            },
+            {"role": "user", "content": prompt},
+        ],
     )
 
-    results = classifier(issue_data)
-    return results[0]["label"]
+    result = response.choices[0].message.parsed
+    print(f"{Fore.GREEN} LLM Issue Clf Response: {result}")
+    return result.label

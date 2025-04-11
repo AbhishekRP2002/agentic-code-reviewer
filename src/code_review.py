@@ -1,15 +1,16 @@
 import os
+import sys
 import requests
-from github import Github
-from colorama import init, Fore
+from github import Github, GithubException
+from github.Issue import Issue
 from langchain_openai import AzureOpenAI
 from jinja2 import Template
-from src import issue_label_clf
+from src import issue_label_clf, logger, Fore
 import argparse
 import base64
+from dotenv import load_dotenv
 
-# Initialize Colorama for colorful console output
-init(autoreset=True)
+load_dotenv()
 
 
 class Repo:
@@ -41,6 +42,8 @@ class Repo:
         self.azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         self.repository = self.get_repo()
         exclude_extensions = os.getenv("EXCLUDE_EXTENSIONS")
+        logger.info(f"Repo owner: {self.owner}")
+        logger.info(f"Repo name: {self.repo}")
         if exclude_extensions:
             self.exclude_extensions = list(
                 set(
@@ -52,9 +55,30 @@ class Repo:
             self.exclude_extensions = self.DEFAULT_EXCLUDES.copy()
 
     def get_repo(self):
-        github_api = Github(self.github_token)
-        repository = github_api.get_repo(f"{self.owner}/{self.repo}")
-        return repository
+        try:
+            if not all([self.owner, self.repo, self.github_token]):
+                raise ValueError(
+                    "Missing required environment variables: REPO_OWNER, REPO_NAME, or GITHUB_TOKEN"
+                )
+
+            github_api = Github(self.github_token)
+            repository = github_api.get_repo(f"{self.owner}/{self.repo}")
+            # Test access
+            logger.info(f"Testing access to repository \n {repository}")
+
+            repository.get_pulls(state="open", sort="created", direction="desc")
+            return repository
+        except GithubException as e:
+            logger.error(f"GitHub API error: {e.status} - {e.data.get('message', '')}")
+            print(
+                Fore.RED
+                + f"Error: Cannot access repository {self.owner}/{self.repo}. Check your token permissions."
+            )
+            sys.exit(1)
+        except Exception as e:
+            logger.error(f"Unexpected error: {str(e)}")
+            print(Fore.RED + f"Unexpected error: {str(e)}")
+            sys.exit(1)
 
     def fetch_pull_request(self, id=None):
         try:
@@ -73,14 +97,16 @@ class Repo:
             print(Fore.RED + f"Error fetching pull request: {str(e)}")
             return None
 
-    def fetch_issue(self, id=None):
+    def fetch_issue(self, id=None) -> Issue:
         try:
             if id:
-                return (
-                    self.repository.get_issue(id)
-                    if self.repository.get_issue(id)
-                    else None
-                )
+                logger.info(f"Fetching issue #{id}")
+                issue = self.repository.get_issue(id)
+                if issue:
+                    logger.info(f"Successfully fetched issue: {issue.title}")
+                    return issue
+                logger.error("Issue object is None")
+                return None
             else:
                 issues = self.repository.get_issues(
                     state="open", sort="created", direction="desc"
@@ -90,7 +116,15 @@ class Repo:
                     if issues.totalCount > 0 and not issues[0].pull_request
                     else None
                 )
+        except GithubException as e:
+            logger.error(f"GitHub API error: {e.status} - {e.data.get('message', '')}")
+            logger.error(f"Response data: {e.data}")
+            print(Fore.RED + f"Error fetching issue: {str(e)}")
+            return None
         except Exception as e:
+            logger.error(f"Unexpected error while fetching issue: {str(e)}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error args: {e.args}")
             print(Fore.RED + f"Error fetching issue: {str(e)}")
             return None
 
@@ -199,10 +233,14 @@ class Repo:
             print(Fore.RED + "Can't load pull request.")
 
     def label_issue(self):
-        issue = self.fetch_issue(self.event_number)
-        if issue:
-            return issue_label_clf.label_issue(issue.title, issue.body)
-        else:
+        try:
+            issue = self.fetch_issue(self.event_number)
+            if isinstance(issue, Issue) and issue:
+                return issue_label_clf.label_issue(issue.title, issue.body)
+        except Exception as e:
+            logger.error(
+                f"Error in labeling issue: {e.status} - {e.data.get('message', '')}"
+            )
             print(Fore.RED + "Can't find issue.")
 
     def create_label(self, label=None):
