@@ -4,16 +4,11 @@ from transformers import (
     AutoTokenizer,
     pipeline,
 )
-import gensim
 
 
 def preprocess(issue_title, issue_body):
-    # concatenate title and body, then remove whitespaces
-    doc = ""
-    doc += str(issue_title)
-    doc += " "
-    doc += str(issue_body)
-    doc = gensim.parsing.preprocessing.strip_multiple_whitespaces(doc)
+    doc = f"{str(issue_title)} {str(issue_body)}"
+    doc = " ".join(doc.split())
     return doc
 
 
