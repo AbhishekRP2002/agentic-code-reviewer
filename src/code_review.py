@@ -215,7 +215,9 @@ class Repo:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="RepoFix GitHub event handler")
+    parser = argparse.ArgumentParser(
+        description="Code Review Agent GitHub event handler"
+    )
     parser.add_argument(
         "event_type", choices=["issues", "pull_request"], help="Type of GitHub event"
     )
