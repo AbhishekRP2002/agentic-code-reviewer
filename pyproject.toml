@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "agentic-code-reviewer"
+version = "0.0.1"
+description = "agentic code review system using llm"
+authors = ["Abhishek Ranjan <aviranjan444@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pygithub = "^2.6.1"
+langchain = "^0.3.23"
+langgraph = "^0.3.28"
+transformers = "^4.51.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
