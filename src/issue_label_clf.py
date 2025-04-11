@@ -1,9 +1,10 @@
 import os
 from typing import Literal
-from openai import OpenAI
+from openai import AzureOpenAI
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from src import logger, Fore  # noqa
+from pprint import pformat
 
 load_dotenv()
 
@@ -39,7 +40,11 @@ class IssueLabel(BaseModel):
 def label_issue(issue_title, issue_body):
     # issue_data = preprocess(issue_title, issue_body)
     # Load the original configuration
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = AzureOpenAI(
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_version="2025-01-01-preview",
+    )
     prompt = f"""Analyze this GitHub issue and classify it as either 'bug', 'enhancement', 'question', 'documentation', 'help wanted', or 'good first issue'.
     
     Issue Title: {issue_title}
@@ -60,8 +65,10 @@ def label_issue(issue_title, issue_body):
             },
             {"role": "user", "content": prompt},
         ],
+        temperature=0.1,
+        max_tokens=4096,
     )
 
     result = response.choices[0].message.parsed
-    print(f"{Fore.GREEN} LLM Issue Clf Response: {result}")
+    logger.info(f"{Fore.GREEN} Issue classification result: {pformat(result)}")
     return result.label

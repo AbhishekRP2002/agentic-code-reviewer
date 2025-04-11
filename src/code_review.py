@@ -245,7 +245,7 @@ class Repo:
 
     def create_label(self, label=None):
         self.repository.get_issue(self.event_number).set_labels(label)
-        print(Fore.GREEN + "Label created successfully.")
+        print(Fore.GREEN + "Label created successfully!")
 
     def create_comment(self, comment=None):
         self.repository.get_issue(self.event_number).create_comment(comment)
