@@ -11,4 +11,4 @@ RUN poetry install --no-interaction --no-ansi --no-root
 
 COPY . .
 
-CMD ["python", "src/code_review.py"]
+ENTRYPOINT ["python", "src/code_review.py"]
