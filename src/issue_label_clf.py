@@ -1,6 +1,6 @@
 import os
 from typing import Literal
-from openai import AzureOpenAI
+from google import genai
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from src import logger, Fore  # noqa
@@ -40,11 +40,7 @@ class IssueLabel(BaseModel):
 def label_issue(issue_title, issue_body):
     # issue_data = preprocess(issue_title, issue_body)
     # Load the original configuration
-    client = AzureOpenAI(
-        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_version="2025-01-01-preview",
-    )
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     prompt = f"""Analyze this GitHub issue and classify it as either 'bug', 'enhancement', 'question', 'documentation', 'help wanted', or 'good first issue'.
     
     Issue Title: {issue_title}
@@ -55,20 +51,18 @@ def label_issue(issue_title, issue_body):
     - confidence: A number between 0 and 1
     - reasoning: Brief explanation for the classification
     """
-    response = client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
-        response_format=IssueLabel,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are an expert GitHub issue classifier that provides structured JSON outputs.",
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.1,
-        max_tokens=4096,
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-lite",
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": IssueLabel,
+            "temperature": 0.1,
+            "max_output_tokens": 4096,
+            "system_instruction": "You are an expert GitHub issue classifier that provides structured JSON outputs.",
+        },
+        contents=prompt,
     )
 
-    result = response.choices[0].message.parsed
+    result = response.parsed
     logger.info(f"{Fore.GREEN} Issue classification result: {pformat(result)}")
     return result.label

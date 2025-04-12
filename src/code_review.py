@@ -11,6 +11,7 @@ import argparse
 import base64
 from dotenv import load_dotenv
 from pprint import pformat  # noqa
+import json
 
 load_dotenv()
 
@@ -40,16 +41,100 @@ class Repo:
     ]
 
     def __init__(self):
-        self.owner = os.getenv("REPO_OWNER")
-        self.repo = os.getenv("REPO_NAME")
-        self.event_number = int(os.getenv("EVENT_NUMBER"))
         self.github_token = os.getenv("GITHUB_TOKEN")
+        if not self.github_token:
+            logger.error("Missing required environment variable: GITHUB_TOKEN")
+            print(
+                Fore.RED + "Error: Missing required environment variable: GITHUB_TOKEN"
+            )
+            sys.exit(1)
+        github_repository = os.getenv("GITHUB_REPOSITORY")
+        if github_repository:
+            self.owner, self.repo = github_repository.split("/")
+        else:
+            logger.error("Missing standard environment variable: GITHUB_REPOSITORY")
+            print(
+                Fore.RED
+                + "Error: Missing standard environment variable: GITHUB_REPOSITORY"
+            )
+            sys.exit(1)
+
+        # Get event details from the event payload file
+        self.event_number = None
+        self.event_name = os.getenv("GITHUB_EVENT_NAME")
+        event_path = os.getenv("GITHUB_EVENT_PATH")
+
+        if event_path:
+            try:
+                with open(event_path, "r") as f:
+                    event_payload = json.load(f)
+                if self.event_name == "pull_request":
+                    if "number" in event_payload:
+                        self.event_number = event_payload.get("number")
+                    elif "pull_request" in event_payload:
+                        self.event_number = event_payload.get("pull_request", {}).get(
+                            "number"
+                        )
+
+                elif self.event_name == "issues":
+                    self.event_number = event_payload.get("issue", {}).get("number")
+
+                if self.event_number is None:
+                    logger.warning(
+                        f"Could not extract event number from payload for event: {self.event_name}"
+                    )
+
+            except FileNotFoundError:
+                logger.error(f"Event payload file not found at: {event_path}")
+                print(
+                    Fore.RED + f"Error: Event payload file not found at: {event_path}"
+                )
+                sys.exit(1)
+            except json.JSONDecodeError:
+                logger.error(
+                    f"Error decoding JSON from event payload file: {event_path}"
+                )
+                print(
+                    Fore.RED
+                    + f"Error: Could not parse event payload file: {event_path}"
+                )
+                sys.exit(1)
+            except Exception as e:
+                logger.error(f"Unexpected error reading event payload: {str(e)}")
+                print(Fore.RED + f"Unexpected error reading event payload: {str(e)}")
+                sys.exit(1)
+        else:
+            logger.error("Missing standard environment variable: GITHUB_EVENT_PATH")
+            print(
+                Fore.RED
+                + "Error: Missing standard environment variable: GITHUB_EVENT_PATH"
+            )
+            sys.exit(1)
+
+        if self.event_number is None:
+            logger.error("Failed to determine event number from payload.")
+            print(Fore.RED + "Error: Failed to determine event number.")
+            sys.exit(1)
+        try:
+            self.event_number = int(self.event_number)
+        except ValueError:
+            logger.error(
+                f"Extracted event number '{self.event_number}' is not an integer."
+            )
+            print(Fore.RED + f"Error: Invalid event number '{self.event_number}'.")
+            sys.exit(1)
+
         self.azure_openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
         self.azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+
         self.repository = self.get_repo()
         exclude_extensions = os.getenv("EXCLUDE_EXTENSIONS")
         logger.info(f"Repo owner: {self.owner}")
         logger.info(f"Repo name: {self.repo}")
+        logger.info(f"Event number: {self.event_number}")
+        logger.info(f"Event name: {self.event_name}")
+
         if exclude_extensions:
             self.exclude_extensions = list(
                 set(
@@ -137,7 +222,7 @@ class Repo:
 
     def get_llm_response(self, prompt):
         google_genai_client = genai.Client(
-            api_key=os.getenv("GEMINI_API_KEY"),
+            api_key=self.gemini_api_key,
             http_options=types.HttpOptions(api_version="v1"),
         )
         response = google_genai_client.models.generate_content(

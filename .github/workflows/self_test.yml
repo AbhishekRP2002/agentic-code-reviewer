@@ -1,0 +1,28 @@
+name: Self-Test Code Reviewer Action
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issues:
+    types: [opened]
+
+jobs:
+  self-test-code-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Code Reviewer Agent (Self)
+        # Use 'uses: ./' to refer to the action in the root of the checked-out repo
+        uses: ./
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+        #   github_token: ${{ secrets.GITHUB_TOKEN }} # picked up automatically
+
+          # Optional: Add excluded extensions if needed
+          # exclude_extensions: '.log,.tmp'
