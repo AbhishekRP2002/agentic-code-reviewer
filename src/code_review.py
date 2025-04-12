@@ -10,6 +10,7 @@ from src import issue_label_clf, logger, Fore
 import argparse
 import base64
 from dotenv import load_dotenv
+from pprint import pformat  # noqa
 
 load_dotenv()
 
@@ -18,12 +19,12 @@ class Repo:
     SUMMARY_TEMPLATE_PATH = os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
         "prompt_templates",
-        "code_review_prompt.jinja2",
+        "summary_prompt.jinja2",
     )
     REVIEW_TEMPLATE_PATH = os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
         "prompt_templates",
-        "summary_prompt.jinja2",
+        "code_review_prompt.jinja2",
     )
     DEFAULT_EXCLUDES = [
         ".png",
@@ -187,12 +188,14 @@ class Repo:
     def summarize_pull_request(self, only_diff=False):
         pull = self.fetch_pull_request(self.event_number)
         if pull:
-            print(Fore.YELLOW + f"Pull Request Number: {pull.number}")
-            print(Fore.YELLOW + f"Title: {pull.title}")
+            print(Fore.YELLOW + f"Pull Request Number for summary: {pull.number}")
+            print(Fore.YELLOW + f"PR Title: {pull.title}")
             if not only_diff:
                 diffs, files, excluded_files = self._get_diffs_and_files(pull)
                 if pull.changed_files - excluded_files > 0:
-                    prompt = Template(open(self.SUMMARY_TEMPLATE_PATH).read()).render(
+                    with open(self.SUMMARY_TEMPLATE_PATH, "r") as template_file:
+                        template_content = template_file.read()
+                    prompt = Template(template_content).render(
                         num_files=pull.changed_files - excluded_files,
                         diffs=diffs,
                         files=files,
@@ -204,6 +207,7 @@ class Repo:
                 else:
                     print(Fore.RED + "No files to summarize.")
             else:
+                print(f"{Fore.CYAN} Fetching diff URL: {pull.diff_url}")
                 diff = self._fetch_file_content(pull.diff_url)
                 if diff:
                     print(Fore.YELLOW + f"Diff URL: {pull.diff_url}")
@@ -224,12 +228,17 @@ class Repo:
             print(Fore.YELLOW + f"Pull Request Number: {pull.number}")
             print(Fore.YELLOW + f"Title: {pull.title}")
             diffs, files, excluded_files = self._get_diffs_and_files(pull)
+            # logger.info("Diffs: %s", pformat(diffs[0]))
             if pull.changed_files - excluded_files > 0:
-                prompt = Template(open(self.REVIEW_TEMPLATE_PATH).read()).render(
+                with open(self.REVIEW_TEMPLATE_PATH, "r") as template_file:
+                    template_content = template_file.read()
+                logger.info(f" {Fore.YELLOW} Template content: {template_content}")
+                prompt = Template(template_content).render(
                     num_files=pull.changed_files - excluded_files,
                     diffs=diffs,
                     files=files,
                 )
+                # logger.info(f"Prompt to be used for PR review: {prompt}")
                 completion = self.get_llm_response(prompt)
                 print(Fore.MAGENTA + completion)
                 return completion
@@ -269,17 +278,24 @@ if __name__ == "__main__":
         description="Code Review Agent GitHub event handler"
     )
     parser.add_argument(
-        "event_type", choices=["issues", "pull_request"], help="Type of GitHub event"
+        "event_type",
+        choices=["label_issue", "review_pr", "summarize_pr"],
+        default="label_issue",
+        help="Type of GitHub event",
     )
     args = parser.parse_args()
 
     repo = Repo()
 
-    if args.event_type == "issues":
+    if args.event_type == "label_issue":
         label = repo.label_issue()
         if label:
             repo.create_label(label)
-    elif args.event_type == "pull_request":
+    elif args.event_type == "review_pr":
         review_comment = repo.review_pull_request()
         if review_comment:
             repo.create_comment(review_comment)
+    elif args.event_type == "summarize_pr":
+        summary_comment = repo.summarize_pull_request(only_diff=True)
+        if summary_comment:
+            repo.create_comment(summary_comment)

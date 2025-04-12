@@ -14,15 +14,20 @@ Your summary should focus on the changes highlighted in the diff files provided.
 Ensure that the summary does not contain the phrases '#SUMMARY#', '#FILE CONTENT#', '#DIFF#', 'diff', 'File Content', and 'summary'.
 
 {% for i in range(num_files) %}
-[{{ loop.index }}] 
+File {{ loop.index }}
+
 #DIFF#: 
 {{ diffs[i] }}
 
 #FILE CONTENT#: 
 {{ files[i] }}
+
 {%- endfor %}
+
 #SUMMARY#:
+
 {% else %}
+
 Your objective is to write summary for a pull request using the provided context from the diff file.
 The pull request will be described by the diff file, which contains the changes made. The diff file uses specific symbols to denote changes:
 - Lines starting with '+' indicate additions.
