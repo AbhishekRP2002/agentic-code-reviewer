@@ -7,3 +7,7 @@ features to include:
 - suggest code changes
 - static analysis like linting and type checking
 - automatically generate PR descriptions and changelogs
+- maybe think around suggesting unit level tests based on the changes in the PR ?
+
+how do i build a context aware system which keeps track of the PR history of the project and other events ?
+- maybe use a db as knowledge base layer to store PR data and other events

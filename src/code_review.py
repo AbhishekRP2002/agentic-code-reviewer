@@ -3,7 +3,8 @@ import sys
 import requests
 from github import Github, GithubException
 from github.Issue import Issue
-from langchain_openai import AzureOpenAI
+from google import genai
+from google.genai import types
 from jinja2 import Template
 from src import issue_label_clf, logger, Fore
 import argparse
@@ -15,10 +16,14 @@ load_dotenv()
 
 class Repo:
     SUMMARY_TEMPLATE_PATH = os.path.join(
-        os.path.dirname(__file__), "prompt_templates", "code_review_prompt.jinja2"
+        os.path.dirname(os.path.dirname(__file__)),
+        "prompt_templates",
+        "code_review_prompt.jinja2",
     )
     REVIEW_TEMPLATE_PATH = os.path.join(
-        os.path.dirname(__file__), "prompt_templates", "summary_prompt.jinja2"
+        os.path.dirname(os.path.dirname(__file__)),
+        "prompt_templates",
+        "summary_prompt.jinja2",
     )
     DEFAULT_EXCLUDES = [
         ".png",
@@ -83,6 +88,7 @@ class Repo:
     def fetch_pull_request(self, id=None):
         try:
             if id:
+                logger.info(f"Fetching pull request #{id}")
                 return (
                     self.repository.get_pull(id)
                     if self.repository.get_pull(id)
@@ -128,16 +134,22 @@ class Repo:
             print(Fore.RED + f"Error fetching issue: {str(e)}")
             return None
 
-    def setup_llm_completion(self, prompt):
-        client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            azure_deployment="gpt-4o",
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-            api_version="2024-08-01-preview",
-            temperature=0.5,
-            max_retries=3,
+    def get_llm_response(self, prompt):
+        google_genai_client = genai.Client(
+            api_key=os.getenv("GEMINI_API_KEY"),
+            http_options=types.HttpOptions(api_version="v1"),
         )
-        return client.ainvoke(prompt)
+        response = google_genai_client.models.generate_content(
+            model="gemini-2.0-flash-001",
+            contents=prompt,
+            # config=types.GenerateContentConfig(
+            #     system_instruction="You are a Senior Staff Software Engineer - Machine Learning, with 10 years of experience as an IC in the AI/ML Domain.",
+            #     max_output_tokens=4096,
+            #     temperature=0.2,
+            #     response_mime_type="application/json",
+            # ),
+        )
+        return response.text
 
     def _fetch_file_content(self, contents_url):
         response = requests.get(
@@ -186,9 +198,9 @@ class Repo:
                         files=files,
                         context_flag=1,
                     )
-                    completion = self.setup_groq_completion(prompt)
-                    print(Fore.MAGENTA + completion.choices[0].message.content)
-                    return completion.choices[0].message.content
+                    completion = self.get_llm_response(prompt)
+                    print(Fore.MAGENTA + completion)
+                    return completion
                 else:
                     print(Fore.RED + "No files to summarize.")
             else:
@@ -198,9 +210,9 @@ class Repo:
                     prompt = Template(open(self.SUMMARY_TEMPLATE_PATH).read()).render(
                         diff=diff, context_flag=2
                     )
-                    completion = self.setup_groq_completion(prompt)
-                    print(Fore.MAGENTA + completion.choices[0].message.content)
-                    return completion.choices[0].message.content
+                    completion = self.get_llm_response(prompt)
+                    print(Fore.MAGENTA + completion)
+                    return completion
                 else:
                     print(Fore.RED + "Failed to fetch diff data.")
         else:
@@ -218,17 +230,17 @@ class Repo:
                     diffs=diffs,
                     files=files,
                 )
-                completion = self.setup_groq_completion(prompt)
-                print(Fore.MAGENTA + completion.choices[0].message.content)
-                return completion.choices[0].message.content
+                completion = self.get_llm_response(prompt)
+                print(Fore.MAGENTA + completion)
+                return completion
             else:
                 print(Fore.RED + "No files to review.")
             prompt = Template(open(self.REVIEW_TEMPLATE_PATH).read()).render(
                 num_files=pull.changed_files - excluded_files, diffs=diffs, files=files
             )
-            completion = self.setup_groq_completion(prompt)
-            print(Fore.MAGENTA + completion.choices[0].message.content)
-            return completion.choices[0].message.content
+            completion = self.get_llm_response(prompt)
+            print(Fore.MAGENTA + completion)
+            return completion
         else:
             print(Fore.RED + "Can't load pull request.")
 
