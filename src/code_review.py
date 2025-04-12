@@ -103,6 +103,8 @@ class Repo:
                 logger.error(f"Unexpected error reading event payload: {str(e)}")
                 print(Fore.RED + f"Unexpected error reading event payload: {str(e)}")
                 sys.exit(1)
+        elif os.getenv("EVENT_NUMBER"):
+            self.event_number = os.getenv("EVENT_NUMBER")
         else:
             logger.error("Missing standard environment variable: GITHUB_EVENT_PATH")
             print(
