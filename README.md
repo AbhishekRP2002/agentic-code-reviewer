@@ -63,3 +63,5 @@ jobs:
           # The github_token is provided automatically by the runner
           # github_token: ${{ secrets.GITHUB_TOKEN }} # added automatically by the runner
 ```
+
+[Use this action with your project](https://github.com/marketplace/actions/code-reviewer-agent)
