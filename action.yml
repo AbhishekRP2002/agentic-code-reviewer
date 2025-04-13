@@ -15,10 +15,18 @@ inputs:
   exclude_extensions:
     description: 'File extensions to exclude (comma-separated)'
     required: false
+    default: '.md,.txt,.toml,.yml,.yaml,.json,.csv,.xml,.html,.css,.js,.ts,.jsx,.tsx'
+
+  script_command:
+    description: 'The command to pass to the code_review.py script (e.g., label_issue, review_pr)'
+    required: true
 
 runs:
   using: 'docker'
   image: 'Dockerfile'
+  args:
+    - ${{ inputs.script_command }}
+
   env:
     GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
     GITHUB_TOKEN: ${{ inputs.github_token }}

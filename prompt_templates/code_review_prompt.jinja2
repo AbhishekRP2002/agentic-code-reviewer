@@ -28,10 +28,10 @@ Ensure to use markdown formatting for the feedback details and that the review d
 
 {% for i in range(num_files) %}
 [{{ loop.index }}]
-#DIFF#: 
+#DIFF#:
 {{ diffs[i] }}
 
-#FILE CONTENT#: 
+#FILE CONTENT#:
 {{ files[i] }}
 {%- endfor %}
 #REVIEW#:
