@@ -42,10 +42,10 @@ def label_issue(issue_title, issue_body):
     # Load the original configuration
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     prompt = f"""Analyze this GitHub issue and classify it as either 'bug', 'enhancement', 'question', 'documentation', 'help wanted', or 'good first issue'.
-    
+
     Issue Title: {issue_title}
     Issue Description: {issue_body}
-    
+
     Provide your response strictly in JSON format with the following keys:
     - label: The classification (bug/enhancement/question)
     - confidence: A number between 0 and 1

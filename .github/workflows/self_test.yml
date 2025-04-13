@@ -5,7 +5,7 @@
         types: [opened, synchronize, reopened]
       issues:
         types: [opened]
-    
+
     jobs:
       self-test-code-review:
         runs-on: ubuntu-latest
@@ -13,25 +13,25 @@
           contents: read
           pull-requests: write
           issues: write
-    
+
         steps:
           - name: Checkout repository
             uses: actions/checkout@v4
-    
+
           - name: Label Issue
             if: github.event_name == 'issues'
             uses: ./
             with:
               gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
               script_command: 'label_issue'
-    
+
           - name: Review Pull Request
             if: github.event_name == 'pull_request'
             uses: ./
             with:
               gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
               script_command: 'review_pr'
-    
+
           - name: Summarize Pull Request
             if: github.event_name == 'pull_request'
             uses: ./

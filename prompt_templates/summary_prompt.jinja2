@@ -16,10 +16,10 @@ Ensure that the summary does not contain the phrases '#SUMMARY#', '#FILE CONTENT
 {% for i in range(num_files) %}
 File {{ loop.index }}
 
-#DIFF#: 
+#DIFF#:
 {{ diffs[i] }}
 
-#FILE CONTENT#: 
+#FILE CONTENT#:
 {{ files[i] }}
 
 {%- endfor %}

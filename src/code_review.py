@@ -244,10 +244,23 @@ class Repo:
             contents_url, headers={"Authorization": f"Bearer {self.github_token}"}
         )
         if response.status_code == 200:
-            decoded_content = base64.b64decode(response.json()["content"]).decode(
-                "utf-8"
-            )
-            return decoded_content
+            content_type = response.headers.get("Content-Type", "")
+            if "application/json" in content_type:
+                try:
+                    data = response.json()
+                    if "content" in data:
+                        decoded_content = base64.b64decode(data["content"]).decode(
+                            "utf-8"
+                        )
+                        return decoded_content
+                    else:
+                        print(Fore.YELLOW + "No content found in the response JSON.")
+                        return response.text
+                except json.JSONDecodeError as e:
+                    print(Fore.YELLOW + f"Failed to decode JSON response: {e}")
+                    return ""
+            else:
+                return response.text
         else:
             print(
                 Fore.YELLOW
