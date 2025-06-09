@@ -12,6 +12,7 @@ import base64
 from dotenv import load_dotenv
 from pprint import pformat  # noqa
 import json
+from typing import Optional
 
 load_dotenv()
 
@@ -191,7 +192,8 @@ class Repo:
             print(Fore.RED + f"Error fetching pull request: {str(e)}")
             return None
 
-    def fetch_issue(self, id=None) -> Issue:
+
+    def fetch_issue(self, id=None) -> Optional[Issue]:
         try:
             if id:
                 logger.info(f"Fetching issue #{id}")
@@ -209,7 +211,7 @@ class Repo:
                     issues[0]
                     if issues.totalCount > 0 and not issues[0].pull_request
                     else None
-                )
+                ) # type: ignore
         except GithubException as e:
             logger.error(f"GitHub API error: {e.status} - {e.data.get('message', '')}")
             logger.error(f"Response data: {e.data}")
@@ -222,7 +224,7 @@ class Repo:
             print(Fore.RED + f"Error fetching issue: {str(e)}")
             return None
 
-    def get_llm_response(self, prompt):
+    def get_llm_response(self, prompt) -> Optional[str]:
         google_genai_client = genai.Client(
             api_key=self.gemini_api_key,
             http_options=types.HttpOptions(api_version="v1"),
@@ -301,8 +303,8 @@ class Repo:
                         files=files,
                         context_flag=1,
                     )
-                    completion = self.get_llm_response(prompt)
-                    print(Fore.MAGENTA + completion)
+                    completion = self.get_llm_response(prompt) 
+                    print(Fore.MAGENTA + completion) # type: ignore
                     return completion
                 else:
                     print(Fore.RED + "No files to summarize.")
@@ -315,7 +317,8 @@ class Repo:
                         diff=diff, context_flag=2
                     )
                     completion = self.get_llm_response(prompt)
-                    print(Fore.MAGENTA + completion)
+                    print(Fore.MAGENTA + completion) # type: ignore
+
                     return completion
                 else:
                     print(Fore.RED + "Failed to fetch diff data.")
@@ -340,7 +343,7 @@ class Repo:
                 )
                 # logger.info(f"Prompt to be used for PR review: {prompt}")
                 completion = self.get_llm_response(prompt)
-                print(Fore.MAGENTA + completion)
+                print(Fore.MAGENTA + completion) # type: ignore
                 return completion
             else:
                 print(Fore.RED + "No files to review.")
@@ -348,7 +351,7 @@ class Repo:
                 num_files=pull.changed_files - excluded_files, diffs=diffs, files=files
             )
             completion = self.get_llm_response(prompt)
-            print(Fore.MAGENTA + completion)
+            print(Fore.MAGENTA + completion) # type: ignore
             return completion
         else:
             print(Fore.RED + "Can't load pull request.")
@@ -360,16 +363,16 @@ class Repo:
                 return issue_label_clf.label_issue(issue.title, issue.body)
         except Exception as e:
             logger.error(
-                f"Error in labeling issue: {e.status} - {e.data.get('message', '')}"
+                f"Error in labeling issue: {str(e)}"
             )
             print(Fore.RED + "Can't find issue.")
 
     def create_label(self, label=None):
-        self.repository.get_issue(self.event_number).set_labels(label)
+        self.repository.get_issue(int(self.event_number)).set_labels(label) #type: ignore
         print(Fore.GREEN + "Label created successfully!")
 
     def create_comment(self, comment=None):
-        self.repository.get_issue(self.event_number).create_comment(comment)
+        self.repository.get_issue(self.event_number).create_comment(comment) # type: ignore
         print(Fore.GREEN + "Comment created successfully.")
 
 
